@@ -149,10 +149,33 @@
 
     <!-- Category Filter Dropdown (Initially Hidden) -->
     <div id="category-filter-container" class="container my-3">
-      <label for="category-filter" class="form-label fw-bold">Filter by Category:</label>
-      <select id="category-filter" class="form-select" style="max-width: 300px;">
-        <!-- Options will be populated by script.js -->
-      </select>
+      <label class="form-label fw-bold">Filter by Category:</label>
+      <div class="dropdown">
+        <button
+          class="btn btn-secondary dropdown-toggle"
+          type="button"
+          id="categoryDropdown"
+          data-bs-toggle="dropdown"
+          aria-expanded="false"
+        >
+          Select Categories
+        </button>
+        <ul class="dropdown-menu" aria-labelledby="categoryDropdown" style="max-height: 300px; overflow-y: auto;">
+          <li class="dropdown-item">
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" value="" id="category-all" checked>
+              <label class="form-check-label" for="category-all">
+                All Categories
+              </label>
+            </div>
+          </li>
+          <li><hr class="dropdown-divider"></li>
+          <!-- Dynamic Category Checkboxes will be populated by script.js -->
+          <li id="category-checkboxes">
+            <!-- Checkboxes go here -->
+          </li>
+        </ul>
+      </div>
     </div>
 
     <!-- The D3 container for the lineage diagram -->
