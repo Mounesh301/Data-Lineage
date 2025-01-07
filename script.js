@@ -125,8 +125,10 @@ $demos.addEventListener("click", async (e) => {
     drawTables();
     loadCategories(); // Load categories after demo upload
     // Show the category filter if categories exist
-    if ($categoryFilter.options.length > 1) { // More than "All Categories"
+    if (document.querySelectorAll(".category-checkbox").length > 0) { // More than "All Categories"
       $categoryFilterContainer.style.display = "block";
+    } else {
+      $categoryFilterContainer.style.display = "none";
     }
   }
 });
@@ -273,8 +275,10 @@ $upload.addEventListener("change", async (e) => {
   drawTables();
   loadCategories(); // Load categories after upload
   // Show the category filter if categories exist
-  if ($categoryFilter.options.length > 1) { // More than "All Categories"
+  if (document.querySelectorAll(".category-checkbox").length > 0) { // More than "All Categories"
     $categoryFilterContainer.style.display = "block";
+  } else {
+    $categoryFilterContainer.style.display = "none";
   }
 });
 
@@ -575,7 +579,7 @@ data = ${JSON.stringify(latestQueryResult.slice(0, 3))}
 });
 
 //--------------------------------------------------------------------
-// 10. Load Categories into Filter Dropdown
+// 10. Load Categories into Dropdown Checkboxes
 function loadCategories() {
   const categories = db.exec(`
     SELECT DISTINCT category
@@ -585,38 +589,110 @@ function loadCategories() {
   `, { rowMode: "array" });
   // categories will be an array of rows, e.g. [[ 'Loans' ], [ 'Deposits' ], ...]
 
-  // Populate the <select> #category-filter
-  const $filter = document.getElementById("category-filter");
+  // Populate the <li id="category-checkboxes">
+  const $checkboxesContainer = document.getElementById("category-checkboxes");
 
-  // Clear old options
-  $filter.innerHTML = "";
+  // Remove existing category checkboxes except "All Categories"
+  $checkboxesContainer.innerHTML = "";
 
-  // Always add an "All" option
-  const allOption = document.createElement("option");
-  allOption.value = "";
-  allOption.textContent = "All Categories";
-  $filter.appendChild(allOption);
-
-  // Append each unique category
+  // Append each unique category as a checkbox
   categories.forEach(row => {
     const catValue = row[0];
-    const opt = document.createElement("option");
-    opt.value = catValue;
-    opt.textContent = catValue;
-    $filter.appendChild(opt);
+    const checkboxItem = document.createElement("li");
+    checkboxItem.classList.add("dropdown-item");
+
+    const checkboxDiv = document.createElement("div");
+    checkboxDiv.classList.add("form-check");
+
+    const checkbox = document.createElement("input");
+    checkbox.classList.add("form-check-input", "category-checkbox");
+    checkbox.type = "checkbox";
+    checkbox.value = catValue;
+    checkbox.id = `category-${catValue}`;
+    checkbox.checked = true; // Default to checked
+
+    const label = document.createElement("label");
+    label.classList.add("form-check-label");
+    label.htmlFor = `category-${catValue}`;
+    label.textContent = catValue;
+
+    checkboxDiv.appendChild(checkbox);
+    checkboxDiv.appendChild(label);
+    checkboxItem.appendChild(checkboxDiv);
+    $checkboxesContainer.appendChild(checkboxItem);
   });
+
+  // Update the dropdown button text
+  updateDropdownButton();
 }
 
 //--------------------------------------------------------------------
-// 11. Listen for changes to #category-filter
-$categoryFilter.addEventListener("change", (e) => {
-  const selectedCategory = e.target.value;  // e.g. "Loans", or "" for All
-  drawD3Lineage(selectedCategory);
+// Update Dropdown Button Text Based on Selected Categories
+function updateDropdownButton() {
+  const $dropdownButton = document.getElementById("categoryDropdown");
+  const selectedCategories = Array.from(document.querySelectorAll(".category-checkbox:checked"))
+    .map(checkbox => checkbox.value)
+    .filter(value => value !== ""); // Exclude "All Categories"
+
+  if (selectedCategories.length === 0 || selectedCategories.length === document.querySelectorAll(".category-checkbox").length) {
+    $dropdownButton.textContent = "All Categories";
+  } else if (selectedCategories.length === 1) {
+    $dropdownButton.textContent = selectedCategories[0];
+  } else {
+    $dropdownButton.textContent = `${selectedCategories.length} Categories Selected`;
+  }
+}
+
+//--------------------------------------------------------------------
+// 11. Listen for changes to category checkboxes within the dropdown
+document.getElementById("category-filter-container").addEventListener("change", (e) => {
+  const $target = e.target;
+
+  // Handle "All Categories" checkbox
+  if ($target.id === "category-all") {
+    const isChecked = $target.checked;
+    // Toggle all other checkboxes based on "All Categories"
+    document.querySelectorAll(".category-checkbox").forEach(checkbox => {
+      checkbox.checked = isChecked;
+    });
+  } else {
+    // If any individual category is unchecked, uncheck "All Categories"
+    if (!$target.checked) {
+      const $all = document.getElementById("category-all");
+      if ($all.checked) $all.checked = false;
+    } else {
+      // If all individual categories are checked, check "All Categories"
+      const allChecked = Array.from(document.querySelectorAll(".category-checkbox"))
+        .every(checkbox => checkbox.checked);
+      if (allChecked) {
+        document.getElementById("category-all").checked = true;
+      }
+    }
+  }
+
+  // Update the dropdown button text
+  updateDropdownButton();
+
+  // Collect selected categories
+  const selectedCategories = Array.from(document.querySelectorAll(".category-checkbox:checked"))
+    .map(checkbox => checkbox.value)
+    .filter(value => value !== "");
+
+  // If "All Categories" is selected or no categories are selected, set selectedCategories to empty array to indicate no filter
+  const finalSelectedCategories = (document.getElementById("category-all").checked || selectedCategories.length === 0) ? [] : selectedCategories;
+
+  // Redraw the lineage diagram with the selected categories
+  drawD3Lineage(finalSelectedCategories);
+});
+
+// Prevent dropdown from closing when clicking inside the checkbox list
+document.getElementById("category-checkboxes").addEventListener("click", (e) => {
+  e.stopPropagation();
 });
 
 //--------------------------------------------------------------------
-// 12. Update drawD3Lineage to accept a category
-function drawD3Lineage(selectedCategory = "") {
+// 12. Update drawD3Lineage to accept multiple categories
+function drawD3Lineage(selectedCategories = []) {
   const container = document.getElementById("d3-lineage");
   container.innerHTML = "";
 
@@ -631,9 +707,11 @@ function drawD3Lineage(selectedCategory = "") {
     SELECT dataset_id, dataset_name, category
     FROM bank_datasets
   `;
-  if (selectedCategory) {
+
+  if (Array.isArray(selectedCategories) && selectedCategories.length > 0) {
+    const sanitizedCategories = selectedCategories.map(cat => `'${cat.replace("'", "''")}'`).join(", ");
     datasetQuery += `
-      WHERE category = '${selectedCategory.replace("'", "''")}' 
+      WHERE category IN (${sanitizedCategories})
     `;
   }
 
@@ -922,5 +1000,3 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initially hide the category filter container
   $categoryFilterContainer.style.display = "none";
 });
-
-//--------------------------------------------------------------------
