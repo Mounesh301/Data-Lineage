@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta
+    name="viewport"
+    content="width=device-width, initial-scale=1.0"
+  />
+  <link
+    rel="icon"
+    href="https://raw.githubusercontent.com/gramener/assets/main/straive-favicon.svg"
+  />
+  <title>DataChat</title>
+  <!-- Bootstrap CSS -->
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    crossorigin="anonymous"
+  />
+  <link
+    rel="stylesheet"
+    href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+  />
+  <!-- D3 (v7) for network flow diagrams -->
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <style>
+    .narrative {
+      max-width: 40rem;
+    }
+
+    /* Styles for the D3 diagram */
+    #d3-lineage svg {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      border: 1px solid #ddd;
+      background: #f9f9f9;
+    }
+
+    /* Initially hide the category filter */
+    #category-filter-container {
+      display: none;
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="navbar navbar-expand-lg bg-body-tertiary" data-bs-theme="dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href=".">DataChat</a>
+      <button
+        class="navbar-toggler"
+        type="button"
+        data-bs-toggle="collapse"
+        data-bs-target="#navbarSupportedContent"
+        aria-controls="navbarSupportedContent"
+        aria-expanded="false"
+        aria-label="Toggle navigation"
+      >
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div
+        class="collapse navbar-collapse"
+        id="navbarSupportedContent"
+      >
+        <div
+          class="nav-item dropdown ms-auto"
+          role="group"
+          aria-label="Toggle dark mode"
+          title="Toggle Dark Mode"
+        >
+          <button
+            class="dark-theme-toggle btn btn-outline-light dropdown-toggle"
+            type="button"
+            data-bs-toggle="dropdown"
+            aria-expanded="false"
+            aria-label="Toggle theme (auto)"
+          >
+            <i class="bi bi-circle-half"></i>
+            <span class="d-lg-none ms-2">Toggle theme</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li>
+              <button
+                class="dropdown-item"
+                data-bs-theme-value="light"
+              >
+                <i class="me-2 bi bi-sun-fill"></i> Light
+              </button>
+            </li>
+            <li>
+              <button
+                class="dropdown-item"
+                data-bs-theme-value="dark"
+              >
+                <i class="me-2 bi bi-moon-stars-fill"></i> Dark
+              </button>
+            </li>
+            <li>
+              <button
+                class="dropdown-item"
+                data-bs-theme-value="auto"
+              >
+                <i class="me-2 bi bi-circle-half"></i> Auto
+              </button>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container-fluid">
+    <h1 class="display-1 my-4 text-center">DataChat</h1>
+    <h2 class="display-6 text-center">Talk to your dataset</h2>
+    <div class="mx-auto my-3 narrative"></div>
+
+    <!-- Demo datasets from config.json will load here -->
+    <div class="container">
+      <div
+        id="demos"
+        class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 my-5"
+      >
+        <div
+          class="spinner-border d-block mx-auto"
+          role="status"
+        ></div>
+      </div>
+    </div>
+
+    <!-- Upload form (populated by script.js) -->
+    <form id="upload" class="mt-5 mx-auto narrative"></form>
+
+    <!-- Displays the DB schema and question form -->
+    <div id="tables-container" class="table-responsive"></div>
+
+    <!-- Displays the SQL from the LLM -->
+    <div id="sql" class="narrative mx-auto my-3"></div>
+
+    <!-- The SQL result table -->
+    <div id="result" class="table-responsive container mx-auto"></div>
+
+    <!-- Chart.js area -->
+    <div id="chart-container" class="container my-3">
+      <canvas id="chart"></canvas>
+    </div>
+    <pre id="chart-code" class="narrative mx-auto my-3"></pre>
+
+    <!-- Category Filter Dropdown (Initially Hidden) -->
+    <div id="category-filter-container" class="container my-3">
+      <label for="category-filter" class="form-label fw-bold">Filter by Category:</label>
+      <select id="category-filter" class="form-select" style="max-width: 300px;">
+        <!-- Options will be populated by script.js -->
+      </select>
+    </div>
+
+    <!-- The D3 container for the lineage diagram -->
+    <div id="d3-lineage" class="container my-4"></div>
+  </div>
+
+  <footer
+    class="my-5 vh-100 d-flex align-items-center justify-content-center"
+  >
+    <h1 class="display-4">
+      Designed by
+      <a
+        href="https://gramener.com/"
+        class="text-reset link-offset-3 link-underline link-underline-opacity-25"
+        >Gramener</a
+      >
+    </h1>
+  </footer>
+
+  <!-- Toast container for notifications -->
+  <div
+    class="toast-container position-fixed top-0 end-0 p-3"
+  >
+    <div
+      id="toast"
+      class="toast"
+      role="alert"
+      aria-live="assertive"
+      aria-atomic="true"
+    >
+      <div class="toast-header">
+        <i class="bi bi-info-circle-fill toast-icon me-2"></i>
+        <strong class="me-auto toast-title"></strong>
+        <small class="toast-time"></small>
+        <button
+          type="button"
+          class="btn-close"
+          data-bs-dismiss="toast"
+          aria-label="Close"
+        ></button>
+      </div>
+      <div class="toast-body"></div>
+    </div>
+  </div>
+
+  <!-- Bootstrap Bundle -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+    crossorigin="anonymous"
+  ></script>
+  <!-- Dark theme toggle -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/@gramex/ui@0.3/dist/dark-theme.js"
+    type="module"
+  ></script>
+
+  <!-- Chart.js used for query results visualization -->
+  <script
+    src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"
+  ></script>
+
+  <!-- Our main app script -->
+  <script src="script.js" type="module"></script>
+</body>
+</html>
